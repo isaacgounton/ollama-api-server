@@ -10,8 +10,6 @@ dotenv.config();
 
 const app = express();
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-// API key should be stored securely in environment variables
-const API_KEYS = (process.env.ALLOWED_API_KEYS || '').split(',');
 
 app.use(express.json());
 app.use(cors());
