@@ -23,6 +23,11 @@ const adminKey = process.env.ADMIN_KEY || 'change-me-in-production';
 const apiKeysFile = path.join(__dirname, '../config/api-keys.json');
 new AdminDashboard(app, adminKey, apiKeysFile);
 
+// Serve API documentation
+app.get('/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, '../docs/API.md'));
+});
+
 // API Key validation middleware
 const validateApiKey = (req, res, next) => {
   const apiKey = req.header('X-API-Key');
