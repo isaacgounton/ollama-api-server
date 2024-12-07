@@ -7,9 +7,30 @@ dotenv.config();
 
 const app = express();
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+// API key should be stored securely in environment variables
+const API_KEYS = (process.env.ALLOWED_API_KEYS || '').split(',');
 
 app.use(express.json());
 app.use(cors());
+
+// API Key validation middleware
+const validateApiKey = (req, res, next) => {
+  const apiKey = req.header('X-API-Key');
+  
+  if (!apiKey) {
+    return res.status(401).json({
+      error: 'API key is required. Please provide it in the X-API-Key header.'
+    });
+  }
+
+  if (!API_KEYS.includes(apiKey)) {
+    return res.status(403).json({
+      error: 'Invalid API key.'
+    });
+  }
+
+  next();
+};
 
 // Error handler middleware
 const errorHandler = (err, req, res, next) => {
@@ -18,6 +39,14 @@ const errorHandler = (err, req, res, next) => {
     error: err.message || 'Internal Server Error'
   });
 };
+
+// Apply API key validation to all routes except health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Protected routes
+app.use('/api', validateApiKey);
 
 // Generate endpoint
 app.post('/api/generate', async (req, res, next) => {
@@ -87,14 +116,13 @@ app.post('/api/embeddings', async (req, res, next) => {
   }
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3004;
 app.listen(PORT, () => {
+  // Log allowed API keys (only in development)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Allowed API Keys:', API_KEYS);
+  }
   console.log(`Server running on port ${PORT}`);
 });
