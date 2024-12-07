@@ -2,6 +2,8 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
+const AdminDashboard = require('./components/AdminDashboard');
 
 dotenv.config();
 
@@ -12,6 +14,14 @@ const API_KEYS = (process.env.ALLOWED_API_KEYS || '').split(',');
 
 app.use(express.json());
 app.use(cors());
+
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Initialize admin dashboard
+const adminKey = process.env.ADMIN_KEY || 'change-me-in-production';
+const apiKeysFile = path.join(__dirname, '../config/api-keys.json');
+new AdminDashboard(app, adminKey, apiKeysFile);
 
 // API Key validation middleware
 const validateApiKey = (req, res, next) => {
