@@ -4,6 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const AdminDashboard = require('./components/AdminDashboard');
+const fs = require('fs').promises;
 
 dotenv.config();
 
@@ -28,8 +29,26 @@ app.get('/docs', (req, res) => {
   res.sendFile(path.join(__dirname, '../docs/API.md'));
 });
 
+// Ensure config directory and api-keys.json exist
+const ensureConfigFiles = async () => {
+  const configDir = path.join(__dirname, '../config');
+  const apiKeysPath = path.join(configDir, 'api-keys.json');
+  
+  try {
+    await fs.mkdir(configDir, { recursive: true });
+    try {
+      await fs.access(apiKeysPath);
+    } catch {
+      await fs.writeFile(apiKeysPath, JSON.stringify({ keys: [] }, null, 2));
+    }
+  } catch (error) {
+    console.error('Failed to initialize config files:', error);
+    process.exit(1);
+  }
+};
+
 // API Key validation middleware
-const validateApiKey = (req, res, next) => {
+const validateApiKey = async (req, res, next) => {
   const apiKey = req.header('X-API-Key');
   
   if (!apiKey) {
@@ -38,13 +57,30 @@ const validateApiKey = (req, res, next) => {
     });
   }
 
-  if (!API_KEYS.includes(apiKey)) {
-    return res.status(403).json({
-      error: 'Invalid API key.'
+  try {
+    const apiKeysFile = path.join(__dirname, '../config/api-keys.json');
+    const { keys } = require(apiKeysFile);
+    const keyData = keys.find(k => k.key === apiKey);
+
+    if (!keyData) {
+      return res.status(403).json({
+        error: 'Invalid API key.'
+      });
+    }
+
+    if (new Date(keyData.expiresAt) < new Date()) {
+      return res.status(403).json({
+        error: 'API key has expired.'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Error validating API key:', error);
+    res.status(500).json({
+      error: 'Internal Server Error'
     });
   }
-
-  next();
 };
 
 // Error handler middleware
@@ -134,10 +170,17 @@ app.post('/api/embeddings', async (req, res, next) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3004;
-app.listen(PORT, () => {
-  // Log allowed API keys (only in development)
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('Allowed API Keys:', API_KEYS);
-  }
-  console.log(`Server running on port ${PORT}`);
+
+// Initialize config files before starting server
+ensureConfigFiles().then(() => {
+  app.listen(PORT, () => {
+    // Log allowed API keys (only in development)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Allowed API Keys:', API_KEYS);
+    }
+    console.log(`Server running on port ${PORT}`);
+  });
+}).catch(error => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });
