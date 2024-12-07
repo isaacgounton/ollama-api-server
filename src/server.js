@@ -57,7 +57,8 @@ const validateApiKey = async (req, res, next) => {
 
   try {
     const apiKeysFile = path.join(__dirname, '../config/api-keys.json');
-    const { keys } = require(apiKeysFile);
+    const data = await fs.readFile(apiKeysFile, 'utf8');
+    const { keys } = JSON.parse(data);
     const keyData = keys.find(k => k.key === apiKey);
 
     if (!keyData) {
