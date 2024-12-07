@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
-const { writeFile } = require('fs/promises');
+const { readFile, writeFile } = require('fs/promises');
 const path = require('path');
 
 class AdminDashboard {
@@ -20,6 +20,16 @@ class AdminDashboard {
     next();
   }
 
+  async getApiKeys() {
+    try {
+      const data = await readFile(this.apiKeysFile, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      // If file doesn't exist or is empty, return default structure
+      return { keys: [] };
+    }
+  }
+
   async saveApiKeys(keys) {
     await writeFile(this.apiKeysFile, JSON.stringify(keys, null, 2));
   }
@@ -28,7 +38,7 @@ class AdminDashboard {
     // Admin routes
     this.app.get('/admin/api-keys', this.validateAdminKey.bind(this), async (req, res) => {
       try {
-        const apiKeys = require(this.apiKeysFile);
+        const apiKeys = await this.getApiKeys();
         // Hide full key values in response
         const safeKeys = apiKeys.keys.map(key => ({
           ...key,
@@ -44,7 +54,7 @@ class AdminDashboard {
       try {
         const { rateLimit } = req.body;
         const newKey = require('crypto').randomBytes(32).toString('hex');
-        const apiKeys = require(this.apiKeysFile);
+        const apiKeys = await this.getApiKeys();
         
         apiKeys.keys.push({
           key: newKey,
@@ -63,7 +73,7 @@ class AdminDashboard {
     this.app.delete('/admin/api-keys/:key', this.validateAdminKey.bind(this), async (req, res) => {
       try {
         const keyToDelete = req.params.key;
-        const apiKeys = require(this.apiKeysFile);
+        const apiKeys = await this.getApiKeys();
         
         const keyIndex = apiKeys.keys.findIndex(k => k.key === keyToDelete);
         if (keyIndex === -1) {
